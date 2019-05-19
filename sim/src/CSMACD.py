@@ -4,7 +4,7 @@
 # This module simulates how the CSMA/CD would act in response to 
 # multiple mediums contesting a broadcast slot.
 from __future__ import print_function
-
+import itertools
 class CSMA_CD_sim():
   """
     Simulator that handles the incoming mMdiums using CSMA/CD 
@@ -35,6 +35,7 @@ class CSMA_CD_sim():
     self._slots = []
     self._slot_number = 0
     self._time = 0
+    self._choices = []
 
   def print_sources(self):
     print ("\nCurrent sources: ")
@@ -46,13 +47,12 @@ class CSMA_CD_sim():
     print ("\nProgress so far:")
     print("S# | ", end='')
     for i in range(len(self._sources)):
-      print( "" + self._sources[i].info() + "  | ", end="")
+      print( " " + self._sources[i].info() + "  | ", end="")
     print("")
     for i in self._slots:
       for j in i:
         print(" "+ j + " |", end="")
-      print("")    
-    print("")    
+      print("")  
 
   def print_curr_state(self):
     print ("\nCurrent State:")
@@ -61,10 +61,24 @@ class CSMA_CD_sim():
     #print out current sources
     for i in range(len(self._sources)):
       print( " "+self._sources[i].info() + " | ", end='')
-      print( " "+self._sources[i].info()+\
-        str(self._sources[i].currFrame()) + "  | ", end = '')
-      print( ""+ str(self._sources[i].collisions())\
-         + "  | ", end = '')
+      if not self._sources[i].done():
+        if (self._sources[i].currFrame()<10):
+          print( " "+self._sources[i].info()+\
+            str(self._sources[i].currFrame()) + "  | ", end = '')
+        else:
+          print( " "+self._sources[i].info()+\
+            str(self._sources[i].currFrame()) + " | ", end = '')
+      else:
+        print(" --- |",end='')
+      if not self._sources[i].done():  
+        if self._sources[i].collisions()<10:
+          print( ""+ str(self._sources[i].collisions())\
+            + "  | ", end = '')
+        else:
+          print( ""+ str(self._sources[i].collisions())\
+            + " | ", end = '')
+      else:
+        print("--- | ",end='')
       print( str(self._sources[i].possibleSlots()))
   
   def print_choices(self):
@@ -84,23 +98,71 @@ class CSMA_CD_sim():
     self._slot_number += 1
     if choices.count(1)>1:
       for i in range(len(self._sources)):
+        spa = " " if self._sources[i].currFrame()<10 else ""
         if choices[i]:
+          sl.append(self._sources[i].info()+\
+            str(self._sources[i].currFrame())+spa)
           self._sources[i].collision(self._slot_number)
-          sl.append(self._sources[i].info()+str(self._sources[i].currFrame()))
         else:
           self._sources[i].cycle()
-          sl.append("  ")
+          sl.append("  "+spa)
     else:
       for i in range(len(self._sources)):
+        spa = " " if self._sources[i].currFrame()<10 else ""
         if choices[i]:
-          self._sources[i].success(self._slot_number)
-          sl.append(self._sources[i].info()+str(self._sources[i].currFrame()))
+          sl.append(self._sources[i].info()+\
+            str(self._sources[i].currFrame())+spa)
+          self._sources[i].success(self._slot_number)  
         else:
           self._sources[i].cycle()
-          sl.append("  ")
+          sl.append("  "+spa)
     self._slots.append(sl)
 
-    
+  def decode(self,idx):
+    assert isinstance(idx,int)
+    if idx < len(self._choices):
+      output = []
+      lst = self._choices[idx]
+      if len(lst) == 0:
+        for i in range(len(self._sources)):
+          output.append( 0 )
+      else:
+        for i in range(len(self._sources)):
+          src = self._sources[i]
+          idx = (src.info()+str(src.currFrame())) in lst
+          if idx:
+            output.append(1)
+          else:
+            output.append(0)     
+
+      print (output)
+      return output
+    return -1
+
+  def calc_posi(self):
+    must_choose = []
+    poss = []
+    choi = []
+    choices = []
+    for i in range(len(self._sources)):
+      src = self._sources[i]
+      if (len(src.possibleSlots()) == 1 and not\
+        src.done()):
+        must_choose.append(src.info()+str(src.currFrame()))
+      elif (not src.done()):
+        poss.append(src.info() + str(src.currFrame()))
+    for i in range(len(poss)+1):
+      choi.append(list(itertools.combinations(poss,i)))    
+    for i in choi:
+      for j in i:
+        choices.append(list(j))
+    for i in choices:
+      i.extend(must_choose)
+    print (choices)
+    self._choices = choices
+    # self.decode(choices[3])
+
+ 
     
 class Source():
   """
@@ -110,13 +172,19 @@ class Source():
 
   def currFrame(self):
     return self._curr_frame
-
   def collisions(self):
     return self._collisions
   def info(self):
     return self._name
   def possibleSlots(self):
     return self._possible_slots
+  def setFrames(self,frames):
+    assert type(frames)==int
+    self._num_frames = frames
+  def frames(self):
+    return self._num_frames
+  def done(self):
+    return self._done
 
   def __init__ (self,name,num_frames):
     assert isinstance(name,str)
@@ -126,6 +194,7 @@ class Source():
     self._collisions = 0
     self._curr_frame = 0
     self._possible_slots = [0] #slot numbers that are possible
+    self._done = False
 
   def collision(self, slot_number):
     assert isinstance(slot_number,int)
@@ -138,10 +207,14 @@ class Source():
     assert isinstance(slot_number,int)
     self._collisions = 0
     self._curr_frame += 1
-    self._num_frames -= 1
-    self._possible_slots = [slot_number]
+    if(self._curr_frame == self._num_frames):
+      self._done = True
+      self._possible_slots = []
+    else:
+      self._possible_slots = [slot_number]
+
     return self._num_frames
 
   def cycle(self):
-    for i in range(len(self._possible_slots)):
-      self._possible_slots[i] += 1
+    if(self._curr_frame!=self._num_frames):
+      self._possible_slots.pop(0)
