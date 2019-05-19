@@ -7,26 +7,7 @@ from __future__ import print_function
 import itertools
 class CSMA_CD_sim():
   """
-    Simulator that handles the incoming mMdiums using CSMA/CD 
-    These are some of the possible printouts for debugging
-    Progress so far:
-     A | a0  a0      a0  a1
-     B | b0      b0      b0
-     C | c0  c0          c0
-     D | d0      d0          d0
-     E | e0      e0
--------| --  --  --  --  --  --
- Slot #|  0   1   2   3   4   5
-    Current state:
-
-    Source | Current frame | Num. Collisions | Possible slots
-    -------+---------------+-----------------+----------------------------
-    A      | a1            | 1               | 6
-    B      | b0            | 3               | 6,7,8,9,10,11,12
-    C      | c0            | 3               | 6,7,8,9,10,11,12
-    D      | d1            | 0               | 6
-    E      | e0            | 2               | 6
-
+  Simulator that handles the incoming Mediums using CSMA/CD 
   """
   
   def __init__ (self,sources):
@@ -47,11 +28,11 @@ class CSMA_CD_sim():
     print ("\nProgress so far:")
     print("S# | ", end='')
     for i in range(len(self._sources)):
-      print( " " + self._sources[i].info() + "  | ", end="")
+      print( "" + self._sources[i].info() + "  | ", end="")
     print("")
     for i in self._slots:
       for j in i:
-        print(" "+ j + " |", end="")
+        print(""+ j + "|", end="")
       print("")  
 
   def print_curr_state(self):
@@ -94,28 +75,34 @@ class CSMA_CD_sim():
     """
     assert isinstance(choices,list)
     sl = []
-    sl.append(str(self._slot_number))
+    slot_num = self._slot_number
+    if slot_num<10:
+      sl.append(" "+str(self._slot_number)+" ")
+    elif slot_num<100:
+      sl.append(""+str(self._slot_number)+" ")
+    else:
+      sl.append(""+str(self._slot_number)+"")
     self._slot_number += 1
     if choices.count(1)>1:
       for i in range(len(self._sources)):
-        spa = " " if self._sources[i].currFrame()<10 else ""
+        spa = "  " if self._sources[i].currFrame()<10 else ""
         if choices[i]:
-          sl.append(self._sources[i].info()+\
+          sl.append(""+self._sources[i].info()+\
             str(self._sources[i].currFrame())+spa)
           self._sources[i].collision(self._slot_number)
         else:
           self._sources[i].cycle()
-          sl.append("  "+spa)
+          sl.append("    ")
     else:
       for i in range(len(self._sources)):
-        spa = " " if self._sources[i].currFrame()<10 else ""
+        spa = "  " if self._sources[i].currFrame()<10 else ""
         if choices[i]:
           sl.append(self._sources[i].info()+\
             str(self._sources[i].currFrame())+spa)
           self._sources[i].success(self._slot_number)  
         else:
           self._sources[i].cycle()
-          sl.append("  "+spa)
+          sl.append("    ")
     self._slots.append(sl)
 
   def decode(self,idx):
@@ -158,9 +145,9 @@ class CSMA_CD_sim():
         choices.append(list(j))
     for i in choices:
       i.extend(must_choose)
-    print (choices)
+    for i in range(len(choices)):
+      print ("%d. %s"%(i, str(choices[i])))
     self._choices = choices
-    # self.decode(choices[3])
 
  
     
